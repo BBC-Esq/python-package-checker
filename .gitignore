@@ -1,0 +1,17 @@
+# Bundled Python runtime and local build tools (not part of the program)
+/tools/
+
+# Generated executables and build output
+*.exe
+
+# Logs and transient state files
+*.log
+*_progress.json
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+
+# Windows shell cruft
+Thumbs.db
+desktop.ini
