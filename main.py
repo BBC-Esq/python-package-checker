@@ -299,7 +299,7 @@ class PipCheckWorker(QObject):
                 text=True,
                 **SUBPROCESS_PLATFORM_KWARGS
             )
-            stdout, stderr = process.communicate()
+            stdout, stderr = process.communicate(timeout=120)
 
             output = ""
             if stdout.strip():
@@ -310,6 +310,10 @@ class PipCheckWorker(QObject):
                 output += f"\n\nErrors:\n{stderr}"
 
             self.finished.emit(output)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            self.error.emit("Pip check timed out")
         except Exception as e:
             self.error.emit(str(e))
 
