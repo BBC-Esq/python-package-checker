@@ -4,6 +4,7 @@ import subprocess
 import urllib.request
 import urllib.error
 import json
+import re
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -16,6 +17,8 @@ from PySide6.QtCore import Qt, QObject, QThread, Signal, QPoint, QSettings
 
 from packaging import version
 from packaging.version import InvalidVersion
+from packaging.requirements import Requirement, InvalidRequirement
+from packaging.utils import canonicalize_name
 
 if sys.platform == "win32":
     SUBPROCESS_PLATFORM_KWARGS = {"creationflags": subprocess.CREATE_NO_WINDOW}
@@ -517,8 +520,10 @@ class CompareDependenciesDialog(QDialog):
             latest_text = "No dependencies found."
         self.latest_label.setText(f"<b>Latest:</b>\n{latest_text}")
 
-        added = set(filtered_latest_deps) - set(filtered_current_deps)
-        removed = set(filtered_current_deps) - set(filtered_latest_deps)
+        current_names = {self._dep_name(d) for d in filtered_current_deps}
+        latest_names = {self._dep_name(d) for d in filtered_latest_deps}
+        added = latest_names - current_names
+        removed = current_names - latest_names
 
         if added:
             added_text = "<b>Added:</b> " + ", ".join(sorted(added))
@@ -549,6 +554,19 @@ class CompareDependenciesDialog(QDialog):
             return deps
         filtered = [dep for dep in deps if 'extra' not in dep.lower()]
         return filtered
+
+    def _dep_name(self, dep):
+        """Return the canonical distribution name from a dependency string.
+
+        Handles both bare names (from `pip show` Requires) and full PEP 508
+        requirement strings (from PyPI requires_dist), so the added/removed
+        comparison is name-vs-name instead of name-vs-specifier.
+        """
+        try:
+            return canonicalize_name(Requirement(dep).name)
+        except InvalidRequirement:
+            name = re.split(r'[<>=!~;\s\[\(]', dep, maxsplit=1)[0]
+            return canonicalize_name(name)
 
 
 class OutputDialog(QDialog):
