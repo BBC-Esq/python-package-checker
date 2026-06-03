@@ -6,6 +6,12 @@ JSON API, built with PySide6.
 
 ![Python Package Checker screenshot](assets/screenshot.png)
 
+Right-click any package and choose **Upgrade / Downgrade** to install any
+version available on PyPI (newest first, with release dates and pre-release
+markers):
+
+![Right-click context menu and version list](assets/version-menu.png)
+
 ## Features
 
 - **Check All** — list every installed package with its current and latest version
@@ -42,12 +48,6 @@ python main.py
    command into the command bar and press Enter.
 3. Right-click any package row for upgrade/downgrade, package info, or a
    dependency comparison.
-
-Choosing **Upgrade / Downgrade** lists every version available on PyPI
-(newest first, with release dates and pre-release markers), so you can
-install any specific version:
-
-![Version selection menu](assets/version-menu.png)
 
 > All operations run against the **selected project's** interpreter, not the
 > environment this application itself runs in.
