@@ -1225,33 +1225,24 @@ class PackageChecker(QMainWindow):
     def on_package_info_finished(self, info):
         self._end_busy()
         package_name = self.package_info_name
-        description = info.get('summary', 'No description available.')
-        author = info.get('author', 'N/A')
-        homepage = info.get('home_page', 'N/A')
-        package_url = info.get('package_url', f"https://pypi.org/project/{package_name}/")
+        # PyPI returns these as JSON null for many packages; .get(key, default)
+        # only substitutes a missing key, not a null value, so coerce with `or`
+        # to avoid rendering the literal "None".
+        description = info.get('summary') or 'No description available.'
+        author = info.get('author') or 'N/A'
+        homepage = info.get('home_page') or ''
+        package_url = info.get('package_url') or f"https://pypi.org/project/{package_name}/"
         project_urls = info.get('project_urls') or {}
-        documentation = project_urls.get('Documentation', 'N/A')
+        documentation = project_urls.get('Documentation') or ''
         info_dialog = QDialog(self)
         info_dialog.setWindowTitle(f"Package Info: {package_name}")
         layout = QVBoxLayout(info_dialog)
         layout.addWidget(QLabel(f"<b>Package:</b> {package_name}"))
         layout.addWidget(QLabel(f"<b>Author:</b> {author}"))
-        homepage_label = QLabel(f"<b>Homepage:</b> <a href='{homepage}'>{homepage}</a>")
-        homepage_label.setTextFormat(Qt.RichText)
-        homepage_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        homepage_label.setOpenExternalLinks(True)
-        layout.addWidget(homepage_label)
-        pypi_label = QLabel(f"<b>PyPI Page:</b> <a href='{package_url}'>{package_url}</a>")
-        pypi_label.setTextFormat(Qt.RichText)
-        pypi_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-        pypi_label.setOpenExternalLinks(True)
-        layout.addWidget(pypi_label)
-        if documentation != 'N/A':
-            doc_label = QLabel(f"<b>Documentation:</b> <a href='{documentation}'>{documentation}</a>")
-            doc_label.setTextFormat(Qt.RichText)
-            doc_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
-            doc_label.setOpenExternalLinks(True)
-            layout.addWidget(doc_label)
+        layout.addWidget(self._make_link_label("Homepage", homepage))
+        layout.addWidget(self._make_link_label("PyPI Page", package_url))
+        if documentation:
+            layout.addWidget(self._make_link_label("Documentation", documentation))
         description_label = QLabel(f"<b>Description:</b> {description}")
         description_label.setWordWrap(True)
         layout.addWidget(description_label)
@@ -1261,6 +1252,17 @@ class PackageChecker(QMainWindow):
     def on_package_info_error(self, error_message):
         self._end_busy()
         self.show_message("Error", error_message)
+
+    def _make_link_label(self, label, value):
+        """QLabel rendering value as a clickable link when it is a URL, or as
+        plain text otherwise (so a missing field shows 'N/A', not a dead link)."""
+        if value.startswith(('http://', 'https://')):
+            link = QLabel(f"<b>{label}:</b> <a href='{value}'>{value}</a>")
+            link.setTextFormat(Qt.RichText)
+            link.setTextInteractionFlags(Qt.TextBrowserInteraction)
+            link.setOpenExternalLinks(True)
+            return link
+        return QLabel(f"<b>{label}:</b> {value or 'N/A'}")
 
     def set_tooltip_for_package(self, row, package_name):
         dep_info = self.dependencies_map.get(package_name, {})
