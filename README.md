@@ -4,13 +4,7 @@ A desktop GUI for inspecting and managing the packages installed in a Python
 project's virtual environment — a graphical front-end over `pip` and the PyPI
 JSON API, built with PySide6.
 
-![Python Package Checker screenshot](assets/screenshot.png)
-
-Right-click any package and choose **Upgrade / Downgrade** to install any
-version available on PyPI (newest first, with release dates and pre-release
-markers):
-
-![Right-click context menu and version list](assets/version-menu.png)
+![Python Package Checker: right-click a package to install any version from PyPI](assets/version-menu.png)
 
 ## Features
 
