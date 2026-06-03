@@ -43,5 +43,11 @@ python main.py
 3. Right-click any package row for upgrade/downgrade, package info, or a
    dependency comparison.
 
+Choosing **Upgrade / Downgrade** lists every version available on PyPI
+(newest first, with release dates and pre-release markers), so you can
+install any specific version:
+
+![Version selection menu](assets/version-menu.png)
+
 > All operations run against the **selected project's** interpreter, not the
 > environment this application itself runs in.
