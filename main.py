@@ -21,10 +21,20 @@ from packaging.version import InvalidVersion
 from packaging.requirements import Requirement, InvalidRequirement
 from packaging.utils import canonicalize_name
 
-if sys.platform == "win32":
-    SUBPROCESS_PLATFORM_KWARGS = {"creationflags": subprocess.CREATE_NO_WINDOW}
-else:
-    SUBPROCESS_PLATFORM_KWARGS = {}
+def _build_subprocess_kwargs():
+    # Force UTF-8 for child pip processes (both how they emit text and how we
+    # decode it) so non-ASCII package metadata can't raise UnicodeDecodeError
+    # on Windows, where the default would be the ANSI code page (cp1252).
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    kwargs = {"encoding": "utf-8", "errors": "replace", "env": env}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+    return kwargs
+
+
+SUBPROCESS_PLATFORM_KWARGS = _build_subprocess_kwargs()
 
 
 def get_venv_python(project_path: str) -> str | None:
