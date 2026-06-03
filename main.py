@@ -89,6 +89,18 @@ def safe_version_key(ver_string):
         return (1, ver_string)
 
 
+class VersionTableItem(QTableWidgetItem):
+    """Table item that sorts by parsed version instead of as a string, so a
+    clicked version-column header orders 10.0.0 after 9.0.0 (not before it).
+    Unparseable values (e.g. 'N/A') sort after all real versions."""
+
+    def __lt__(self, other):
+        try:
+            return safe_version_key(self.text()) < safe_version_key(other.text())
+        except (AttributeError, TypeError):
+            return super().__lt__(other)
+
+
 class InstalledPackagesWorker(QObject):
     finished = Signal(list)
     error = Signal(str)
@@ -835,8 +847,8 @@ class PackageChecker(QMainWindow):
 
         for row, (name, ver) in enumerate(packages):
             self.results_table.setItem(row, 0, QTableWidgetItem(name))
-            self.results_table.setItem(row, 1, QTableWidgetItem(ver))
-            self.results_table.setItem(row, 2, QTableWidgetItem("N/A"))
+            self.results_table.setItem(row, 1, VersionTableItem(ver))
+            self.results_table.setItem(row, 2, VersionTableItem("N/A"))
 
         package_names = [pkg[0] for pkg in packages]
         self.deps_thread = QThread(self)
@@ -889,7 +901,7 @@ class PackageChecker(QMainWindow):
             if not name_item or not current_item:
                 continue
             latest = outdated_map.get(name_item.text(), current_item.text())
-            self.results_table.setItem(row, 2, QTableWidgetItem(latest))
+            self.results_table.setItem(row, 2, VersionTableItem(latest))
 
         self.finalize_check_all(updates_available=len(outdated_packages))
 
@@ -951,8 +963,8 @@ class PackageChecker(QMainWindow):
 
         for row, (name, current, latest) in enumerate(outdated_packages):
             self.results_table.setItem(row, 0, QTableWidgetItem(name))
-            self.results_table.setItem(row, 1, QTableWidgetItem(current))
-            self.results_table.setItem(row, 2, QTableWidgetItem(latest))
+            self.results_table.setItem(row, 1, VersionTableItem(current))
+            self.results_table.setItem(row, 2, VersionTableItem(latest))
 
         package_names = [pkg[0] for pkg in outdated_packages]
         self.deps_thread = QThread(self)
