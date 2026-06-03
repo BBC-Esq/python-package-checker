@@ -5,6 +5,7 @@ import urllib.request
 import urllib.error
 import json
 import re
+import shlex
 from pathlib import Path
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
@@ -314,7 +315,17 @@ class CommandWorker(QObject):
 
     def run(self):
         try:
-            command_parts = self.command.strip().split()
+            try:
+                command_parts = shlex.split(self.command.strip(), posix=False)
+            except ValueError as e:
+                self.error.emit(f"Could not parse command: {e}")
+                return
+            # shlex(posix=False) keeps surrounding quotes on tokens; strip them
+            # so a quoted path with spaces is passed to the child as one arg.
+            command_parts = [
+                p[1:-1] if len(p) >= 2 and p[0] == '"' and p[-1] == '"' else p
+                for p in command_parts
+            ]
             if not command_parts:
                 self.error.emit("No command provided")
                 return
