@@ -610,6 +610,7 @@ class PackageChecker(QMainWindow):
         self.python_executable = None
         self.project_path = None
         self.current_mode = None
+        self.busy = False
         self.outdated_packages = []
         self.installed_packages = []
         self.dependencies_map = {}
@@ -695,7 +696,31 @@ class PackageChecker(QMainWindow):
         self.settings.setValue("windowState", self.saveState())
         super().closeEvent(event)
 
+    def _set_controls_enabled(self, enabled):
+        has_project = self.python_executable is not None
+        self.select_project_button.setEnabled(enabled)
+        self.check_all_button.setEnabled(enabled and has_project)
+        self.check_outdated_button.setEnabled(enabled and has_project)
+        self.pip_check_button.setEnabled(enabled and has_project)
+        self.command_input.setEnabled(enabled and has_project)
+
+    def _begin_busy(self):
+        """Lock the UI for a single operation. Returns False if already busy."""
+        if self.busy:
+            return False
+        self.busy = True
+        self._set_controls_enabled(False)
+        self.progress_bar.setVisible(True)
+        return True
+
+    def _end_busy(self):
+        self.busy = False
+        self.progress_bar.setVisible(False)
+        self._set_controls_enabled(True)
+
     def select_project(self):
+        if self.busy:
+            return
         folder = QFileDialog.getExistingDirectory(
             self,
             "Select Project Folder",
@@ -741,15 +766,14 @@ class PackageChecker(QMainWindow):
     def check_all_packages(self):
         if not self.python_executable:
             return
+        if not self._begin_busy():
+            return
 
         self.current_mode = 'all'
         self.deps_error_message = None
         self.results_table.clearContents()
         self.results_table.setRowCount(0)
         self.results_table.setSortingEnabled(False)
-        self.progress_bar.setVisible(True)
-        self.check_all_button.setEnabled(False)
-        self.check_outdated_button.setEnabled(False)
 
         self.installed_thread = QThread()
         self.installed_worker = InstalledPackagesWorker(self.python_executable)
@@ -832,9 +856,7 @@ class PackageChecker(QMainWindow):
         self.finalize_check_all(latest_error=error_message)
 
     def finalize_check_all(self, updates_available=None, latest_error=None):
-        self.progress_bar.setVisible(False)
-        self.check_all_button.setEnabled(True)
-        self.check_outdated_button.setEnabled(True)
+        self._end_busy()
         self.results_table.setSortingEnabled(True)
         self.results_table.sortItems(0, Qt.AscendingOrder)
         self.results_table.scrollToTop()
@@ -856,14 +878,13 @@ class PackageChecker(QMainWindow):
     def check_outdated_packages(self):
         if not self.python_executable:
             return
+        if not self._begin_busy():
+            return
 
         self.current_mode = 'outdated'
         self.results_table.clearContents()
         self.results_table.setRowCount(0)
         self.results_table.setSortingEnabled(False)
-        self.progress_bar.setVisible(True)
-        self.check_all_button.setEnabled(False)
-        self.check_outdated_button.setEnabled(False)
 
         self.outdated_thread = QThread()
         self.outdated_worker = OutdatedPackagesWorker(self.python_executable)
@@ -879,11 +900,8 @@ class PackageChecker(QMainWindow):
         self.outdated_thread.start()
 
     def on_outdated_packages_checked(self, outdated_packages):
-        self.progress_bar.setVisible(False)
-        self.check_all_button.setEnabled(True)
-        self.check_outdated_button.setEnabled(True)
-
         if not outdated_packages:
+            self._end_busy()
             self.show_message("Up to Date", "All packages are up to date!")
             return
 
@@ -917,6 +935,7 @@ class PackageChecker(QMainWindow):
             if item:
                 self.set_tooltip_for_package(row, item.text())
 
+        self._end_busy()
         self.results_table.setSortingEnabled(True)
         self.results_table.sortItems(0, Qt.AscendingOrder)
         self.results_table.scrollToTop()
@@ -924,6 +943,7 @@ class PackageChecker(QMainWindow):
         self.show_message("Outdated Packages", f"Total outdated packages: {len(self.outdated_packages)}")
 
     def on_outdated_dependencies_error(self, error_message):
+        self._end_busy()
         self.results_table.setSortingEnabled(True)
         self.results_table.sortItems(0, Qt.AscendingOrder)
         self.results_table.scrollToTop()
@@ -933,17 +953,14 @@ class PackageChecker(QMainWindow):
                          f"Note: Could not fetch dependency info: {error_message}")
 
     def on_worker_error(self, error_message):
-        self.progress_bar.setVisible(False)
-        self.check_all_button.setEnabled(True)
-        self.check_outdated_button.setEnabled(True)
+        self._end_busy()
         self.show_message("Error", f"Error: {error_message}")
 
     def run_pip_check(self):
         if not self.python_executable:
             return
-
-        self.progress_bar.setVisible(True)
-        self.pip_check_button.setEnabled(False)
+        if not self._begin_busy():
+            return
 
         self.pip_check_thread = QThread()
         self.pip_check_worker = PipCheckWorker(self.python_executable)
@@ -959,15 +976,13 @@ class PackageChecker(QMainWindow):
         self.pip_check_thread.start()
 
     def on_pip_check_finished(self, output):
-        self.progress_bar.setVisible(False)
-        self.pip_check_button.setEnabled(True)
+        self._end_busy()
 
         dialog = OutputDialog(self, "Pip Check Results", output)
         dialog.exec()
 
     def on_pip_check_error(self, error_message):
-        self.progress_bar.setVisible(False)
-        self.pip_check_button.setEnabled(True)
+        self._end_busy()
         self.show_message("Error", f"Pip check failed: {error_message}")
 
     def execute_command(self):
@@ -977,9 +992,9 @@ class PackageChecker(QMainWindow):
         command = self.command_input.text().strip()
         if not command:
             return
+        if not self._begin_busy():
+            return
 
-        self.command_input.setEnabled(False)
-        self.progress_bar.setVisible(True)
         self.command_input.clear()
 
         self.command_thread = QThread()
@@ -998,8 +1013,7 @@ class PackageChecker(QMainWindow):
         self.command_thread.start()
 
     def on_command_finished(self, output):
-        self.progress_bar.setVisible(False)
-        self.command_input.setEnabled(True)
+        self._end_busy()
         self.command_input.setFocus()
 
         dialog = OutputDialog(self, "Command Output", output)
@@ -1011,14 +1025,15 @@ class PackageChecker(QMainWindow):
             self.check_outdated_packages()
 
     def on_command_error(self, error_message):
-        self.progress_bar.setVisible(False)
-        self.command_input.setEnabled(True)
+        self._end_busy()
         self.command_input.setFocus()
 
         dialog = OutputDialog(self, "Command Error", error_message)
         dialog.exec()
 
     def open_context_menu(self, position: QPoint):
+        if self.busy:
+            return
         selected_row = self.results_table.currentRow()
         if selected_row < 0:
             return
@@ -1036,6 +1051,8 @@ class PackageChecker(QMainWindow):
         menu.exec(self.results_table.viewport().mapToGlobal(position))
 
     def fetch_versions(self, package_name, position):
+        if not self._begin_busy():
+            return
         self.package_name_to_upgrade = package_name
         self.position_for_menu = position
 
@@ -1053,9 +1070,11 @@ class PackageChecker(QMainWindow):
         self.thread_versions.start()
 
     def on_versions_fetched(self, versions):
+        self._end_busy()
         self.show_versions_menu(self.package_name_to_upgrade, versions, self.position_for_menu)
 
     def on_versions_error(self, error_message):
+        self._end_busy()
         self.show_message("Error", f"Error while fetching versions: {error_message}")
 
     def show_versions_menu(self, package_name, versions, position):
@@ -1086,9 +1105,9 @@ class PackageChecker(QMainWindow):
         )
         if reply == QMessageBox.No:
             return
+        if not self._begin_busy():
+            return
 
-        self.progress_bar.setVisible(True)
-        self.results_table.setEnabled(False)
         self.package_name_being_updated = package_name
         self.selected_version = selected_version
 
@@ -1108,8 +1127,7 @@ class PackageChecker(QMainWindow):
         self.thread_pip.start()
 
     def on_pip_finished(self, output):
-        self.progress_bar.setVisible(False)
-        self.results_table.setEnabled(True)
+        self._end_busy()
 
         dialog = OutputDialog(self, "Installation Complete",
                              f"Package '{self.package_name_being_updated}' installed successfully.\n\n{output}")
@@ -1121,12 +1139,12 @@ class PackageChecker(QMainWindow):
             self.check_all_packages()
 
     def on_pip_error(self, error_message):
-        self.progress_bar.setVisible(False)
-        self.results_table.setEnabled(True)
+        self._end_busy()
         self.show_message("Error", f"Error while upgrading/downgrading '{self.package_name_being_updated}':\n{error_message}")
 
     def compare_dependencies(self, package_name):
-        self.progress_bar.setVisible(True)
+        if not self._begin_busy():
+            return
         self.package_to_compare = package_name
 
         self.compare_thread = QThread()
@@ -1143,7 +1161,7 @@ class PackageChecker(QMainWindow):
         self.compare_thread.start()
 
     def on_compare_dependencies_finished(self, current_version, latest_version, current_deps, latest_deps):
-        self.progress_bar.setVisible(False)
+        self._end_busy()
 
         dialog = CompareDependenciesDialog(
             self,
@@ -1156,11 +1174,12 @@ class PackageChecker(QMainWindow):
         dialog.exec()
 
     def on_compare_dependencies_error(self, error_message):
-        self.progress_bar.setVisible(False)
+        self._end_busy()
         self.show_message("Error", f"Error comparing dependencies: {error_message}")
 
     def show_package_info(self, package_name):
-        self.progress_bar.setVisible(True)
+        if not self._begin_busy():
+            return
         self.package_info_name = package_name
 
         self.package_info_thread = QThread()
@@ -1177,7 +1196,7 @@ class PackageChecker(QMainWindow):
         self.package_info_thread.start()
 
     def on_package_info_finished(self, info):
-        self.progress_bar.setVisible(False)
+        self._end_busy()
         package_name = self.package_info_name
         description = info.get('summary', 'No description available.')
         author = info.get('author', 'N/A')
@@ -1213,7 +1232,7 @@ class PackageChecker(QMainWindow):
         info_dialog.exec()
 
     def on_package_info_error(self, error_message):
-        self.progress_bar.setVisible(False)
+        self._end_busy()
         self.show_message("Error", error_message)
 
     def set_tooltip_for_package(self, row, package_name):
