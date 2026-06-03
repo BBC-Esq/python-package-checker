@@ -275,6 +275,7 @@ class PipWorker(QObject):
                       f"{self.package_name}=={self.selected_version}", "--no-deps"]
             process = subprocess.Popen(
                 command,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -306,6 +307,7 @@ class PipCheckWorker(QObject):
             command = [self.python_executable, "-m", "pip", "check"]
             process = subprocess.Popen(
                 command,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -361,6 +363,7 @@ class CommandWorker(QObject):
 
             process = subprocess.Popen(
                 command_parts,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
