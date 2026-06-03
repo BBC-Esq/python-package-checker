@@ -4,6 +4,8 @@ A desktop GUI for inspecting and managing the packages installed in a Python
 project's virtual environment — a graphical front-end over `pip` and the PyPI
 JSON API, built with PySide6.
 
+![Python Package Checker screenshot](assets/screenshot.png)
+
 ## Features
 
 - **Check All** — list every installed package with its current and latest version
