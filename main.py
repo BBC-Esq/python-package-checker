@@ -694,7 +694,23 @@ class PackageChecker(QMainWindow):
     def closeEvent(self, event):
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("windowState", self.saveState())
+        self._stop_running_threads()
         super().closeEvent(event)
+
+    def _stop_running_threads(self):
+        """Stop any worker threads before the window is destroyed.
+
+        A running QThread destroyed during shutdown aborts the process with
+        "QThread: Destroyed while thread is still running". Worker run() slots
+        block in subprocess calls that quit() cannot interrupt, so fall back
+        to terminate() if a thread does not stop within a short grace period.
+        """
+        for thread in self.findChildren(QThread):
+            if thread.isRunning():
+                thread.quit()
+                if not thread.wait(3000):
+                    thread.terminate()
+                    thread.wait()
 
     def _set_controls_enabled(self, enabled):
         has_project = self.python_executable is not None
@@ -775,7 +791,7 @@ class PackageChecker(QMainWindow):
         self.results_table.setRowCount(0)
         self.results_table.setSortingEnabled(False)
 
-        self.installed_thread = QThread()
+        self.installed_thread = QThread(self)
         self.installed_worker = InstalledPackagesWorker(self.python_executable)
         self.installed_worker.moveToThread(self.installed_thread)
         self.installed_thread.started.connect(self.installed_worker.run)
@@ -798,7 +814,7 @@ class PackageChecker(QMainWindow):
             self.results_table.setItem(row, 2, QTableWidgetItem("N/A"))
 
         package_names = [pkg[0] for pkg in packages]
-        self.deps_thread = QThread()
+        self.deps_thread = QThread(self)
         self.deps_worker = PackageDependenciesWorker(self.python_executable, package_names)
         self.deps_worker.moveToThread(self.deps_thread)
         self.deps_thread.started.connect(self.deps_worker.run)
@@ -826,7 +842,7 @@ class PackageChecker(QMainWindow):
         self.fetch_latest_for_all()
 
     def fetch_latest_for_all(self):
-        self.all_outdated_thread = QThread()
+        self.all_outdated_thread = QThread(self)
         self.all_outdated_worker = OutdatedPackagesWorker(self.python_executable)
         self.all_outdated_worker.moveToThread(self.all_outdated_thread)
         self.all_outdated_thread.started.connect(self.all_outdated_worker.run)
@@ -886,7 +902,7 @@ class PackageChecker(QMainWindow):
         self.results_table.setRowCount(0)
         self.results_table.setSortingEnabled(False)
 
-        self.outdated_thread = QThread()
+        self.outdated_thread = QThread(self)
         self.outdated_worker = OutdatedPackagesWorker(self.python_executable)
         self.outdated_worker.moveToThread(self.outdated_thread)
         self.outdated_thread.started.connect(self.outdated_worker.run)
@@ -914,7 +930,7 @@ class PackageChecker(QMainWindow):
             self.results_table.setItem(row, 2, QTableWidgetItem(latest))
 
         package_names = [pkg[0] for pkg in outdated_packages]
-        self.deps_thread = QThread()
+        self.deps_thread = QThread(self)
         self.deps_worker = PackageDependenciesWorker(self.python_executable, package_names)
         self.deps_worker.moveToThread(self.deps_thread)
         self.deps_thread.started.connect(self.deps_worker.run)
@@ -962,7 +978,7 @@ class PackageChecker(QMainWindow):
         if not self._begin_busy():
             return
 
-        self.pip_check_thread = QThread()
+        self.pip_check_thread = QThread(self)
         self.pip_check_worker = PipCheckWorker(self.python_executable)
         self.pip_check_worker.moveToThread(self.pip_check_thread)
         self.pip_check_thread.started.connect(self.pip_check_worker.run)
@@ -997,7 +1013,7 @@ class PackageChecker(QMainWindow):
 
         self.command_input.clear()
 
-        self.command_thread = QThread()
+        self.command_thread = QThread(self)
         self.command_worker = CommandWorker(self.python_executable, command)
         self.command_worker.moveToThread(self.command_thread)
 
@@ -1056,7 +1072,7 @@ class PackageChecker(QMainWindow):
         self.package_name_to_upgrade = package_name
         self.position_for_menu = position
 
-        self.thread_versions = QThread()
+        self.thread_versions = QThread(self)
         self.worker_versions = VersionsWorker(package_name)
         self.worker_versions.moveToThread(self.thread_versions)
         self.thread_versions.started.connect(self.worker_versions.run)
@@ -1111,7 +1127,7 @@ class PackageChecker(QMainWindow):
         self.package_name_being_updated = package_name
         self.selected_version = selected_version
 
-        self.thread_pip = QThread()
+        self.thread_pip = QThread(self)
         self.worker_pip = PipWorker(self.python_executable, package_name, selected_version)
         self.worker_pip.moveToThread(self.thread_pip)
 
@@ -1147,7 +1163,7 @@ class PackageChecker(QMainWindow):
             return
         self.package_to_compare = package_name
 
-        self.compare_thread = QThread()
+        self.compare_thread = QThread(self)
         self.compare_worker = CompareDependenciesWorker(self.python_executable, package_name)
         self.compare_worker.moveToThread(self.compare_thread)
         self.compare_thread.started.connect(self.compare_worker.run)
@@ -1182,7 +1198,7 @@ class PackageChecker(QMainWindow):
             return
         self.package_info_name = package_name
 
-        self.package_info_thread = QThread()
+        self.package_info_thread = QThread(self)
         self.package_info_worker = PackageInfoWorker(package_name)
         self.package_info_worker.moveToThread(self.package_info_thread)
         self.package_info_thread.started.connect(self.package_info_worker.run)
