@@ -82,6 +82,24 @@ def get_venv_name(project_path: str) -> str | None:
     return None
 
 
+def python_has_pip(python_executable):
+    """Return True if the given interpreter has pip available.
+
+    Environments created by tools like `uv venv` omit pip by default, which
+    would otherwise make every operation fail with 'No module named pip'.
+    """
+    try:
+        result = subprocess.run(
+            [python_executable, "-m", "pip", "--version"],
+            capture_output=True,
+            timeout=15,
+            **SUBPROCESS_PLATFORM_KWARGS
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def safe_version_key(ver_string):
     try:
         return (0, version.parse(ver_string))
@@ -796,8 +814,16 @@ class PackageChecker(QMainWindow):
 
             self.project_path_label.setText(folder)
             self.project_path_label.setStyleSheet("color: #FFFFFF;")
-            self.venv_status_label.setText(f"Virtual environment detected: {venv_name}")
-            self.venv_status_label.setStyleSheet("color: #00AA00;")
+
+            has_pip = python_has_pip(python_path)
+            if has_pip:
+                self.venv_status_label.setText(f"Virtual environment detected: {venv_name}")
+                self.venv_status_label.setStyleSheet("color: #00AA00;")
+            else:
+                self.venv_status_label.setText(
+                    f"Virtual environment detected: {venv_name} - pip is NOT available"
+                )
+                self.venv_status_label.setStyleSheet("color: #AA6600;")
 
             self.check_all_button.setEnabled(True)
             self.check_outdated_button.setEnabled(True)
@@ -812,6 +838,16 @@ class PackageChecker(QMainWindow):
             self.dependencies_map = {}
 
             self.setWindowTitle(f"Python Package Checker - {os.path.basename(folder)}")
+
+            if not has_pip:
+                self.show_message(
+                    "pip Not Found",
+                    "The selected environment does not have pip installed.\n\n"
+                    "Environments created by some tools (for example 'uv venv') omit "
+                    "pip by default, and this app's package operations require pip.\n\n"
+                    "To add pip, activate the environment and run:\n"
+                    "    python -m ensurepip --upgrade"
+                )
         else:
             self.show_message("No Virtual Environment Found",
                             f"No virtual environment was found in:\n{folder}\n\n"
