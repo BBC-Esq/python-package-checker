@@ -1135,8 +1135,17 @@ class PackageChecker(QMainWindow):
             self.show_message("No Versions Found", f"No available versions found for '{package_name}'.")
             return
 
+        max_shown = 100
+        ordered = list(reversed(versions))  # newest first
+        shown = ordered[:max_shown]
+
         menu = QMenu(self)
-        for ver, release_date in reversed(versions):
+        if len(ordered) > max_shown:
+            header = menu.addAction(f"Showing newest {max_shown} of {len(ordered)} versions")
+            header.setEnabled(False)
+            menu.addSeparator()
+
+        for ver, release_date in shown:
             action_text = f"{ver} ({release_date})"
             try:
                 if version.parse(ver).is_prerelease:
